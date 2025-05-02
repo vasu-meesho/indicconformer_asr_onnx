@@ -17,6 +17,15 @@ import librosa
 import gdown
 from utils import download_from_drive, download_from_gdrive, create_fbank, compute_features
 
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://vasu-meesho.github.io"],  # Change to your domain in production
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 model_dict= {
     "hi":"1UxQ4bL0-5QEQCiLI5tTu1A9IfI3SsJUO"
 }
@@ -70,7 +79,7 @@ class OnnxModel:
 os.makedirs(MODEL_DIR, exist_ok=True)
 MODEL_PATH = os.path.join(MODEL_DIR, f"model_hi.onnx")
 if not os.path.exists(MODEL_PATH):
-    download_from_drive(model_dict['hi'], MODEL_PATH)
+    download_from_drive(model_dict[lang], MODEL_PATH)
 
 # ----------------------------
 # Load ONNX Runtime Session
@@ -89,14 +98,7 @@ blank = len(id2token) - 1
 # FastAPI Setup
 # ----------------------------
 
-app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Change to your domain in production
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
