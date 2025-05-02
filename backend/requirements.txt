@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+onnxruntime
+soundfile
+numpy
+requests
