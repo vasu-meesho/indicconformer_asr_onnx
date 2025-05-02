@@ -104,7 +104,7 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
         tmp_path = tmp.name
 
     audio, sr = sf.read(tmp_path)
-        if sample_rate != 16000:
+    if sample_rate != 16000:
         audio = librosa.resample(
             audio,
             orig_sr=sample_rate,
