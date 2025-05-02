@@ -86,7 +86,7 @@
         formData.append('language', languageSelect.value);
 
         try {
-          const res = await fetch('https://<your-render-backend-url>/transcribe', {
+          const res = await fetch('https://indicconformer-asr-onnx.onrender.com', {
             method: 'POST',
             body: formData
           });
