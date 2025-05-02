@@ -1,3 +1,8 @@
+import kaldi_native_fbank as knf
+import gdown
+import requests
+import numpy as np
+
 def download_from_drive(file_id, destination):
     url = f"https://drive.google.com/uc?id={file_id}"
     gdown.download(url, destination, quiet=False)
