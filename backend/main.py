@@ -40,12 +40,12 @@ class OnnxModel:
             sess_options=self.session_opts,
             providers=["CPUExecutionProvider"],
         )
-        print("==========Input==========")
-        for i in self.model.get_inputs():
-            print(i)
-        print("==========Output==========")
-        for i in self.model.get_outputs():
-            print(i)
+        #print("==========Input==========")
+        #for i in self.model.get_inputs():
+        #    print(i)
+        #print("==========Output==========")
+        #for i in self.model.get_outputs():
+        #    print(i)
             
     def __call__(self, x: np.ndarray):
         # x: (T, C)
@@ -74,7 +74,7 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 # Load ONNX Runtime Session
 # ----------------------------
 
-fbank = create_fbank()
+
 id2token = dict()
 with open(tokens, encoding="utf-8") as f:
     for line in f:
@@ -91,7 +91,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to your domain in production
+    allow_origins=["https://vasu-meesho.github.io/indicconformer_asr_onnx/"],  # Change to your domain in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -101,7 +101,7 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
     
     MODEL_PATH = os.path.join(MODEL_DIR, f"model_{lang}.onnx")
     if not os.path.exists(MODEL_PATH):
-        download_from_drive(FILE_ID, MODEL_PATH)
+        download_from_drive(model_dict[lang], MODEL_PATH)
     model = OnnxModel(MODEL_PATH)
     
 
@@ -109,7 +109,8 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
         tmp.write(await file.read())
         tmp_path = tmp.name
 
-    audio, sr = sf.read(tmp_path)
+    audio, sample_rate = sf.read(tmp_path)
+    #print(len(audio))
     if sample_rate != 16000:
         audio = librosa.resample(
             audio,
@@ -117,6 +118,7 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
             target_sr=16000,
         )
         sample_rate = 16000
+    fbank = create_fbank()
     features = compute_features(audio, fbank)
     features = torch.from_numpy(features)
     mean = features.mean(dim=1, keepdims=True)
@@ -125,11 +127,12 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
     features = features.numpy()
     
     log_probs = model(features)
+    os.remove(tmp_path)
     
     ans = []
     prev = -1
     log_probs = log_probs[0, :, :]  # remove batch dim
-    print(log_probs.shape)
+    #print(log_probs.shape)
     ids = torch.argmax(log_probs, dim=1).tolist()
     for k in ids:
         if k != blank and k != prev:
