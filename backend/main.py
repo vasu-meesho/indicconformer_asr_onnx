@@ -6,9 +6,13 @@ import kaldi_native_fbank as knf
 import numpy as np
 import soundfile as sf
 
+import tempfile
+
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+
 import onnxruntime as ort
 import torch
-import numpy as np
 import librosa
 import gdown
 from utils import download_from_drive, download_from_gdrive, create_fbank, compute_features
