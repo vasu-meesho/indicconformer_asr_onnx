@@ -68,7 +68,9 @@ class OnnxModel:
 
 # Ensure model exists
 os.makedirs(MODEL_DIR, exist_ok=True)
-
+MODEL_PATH = os.path.join(MODEL_DIR, f"model_hi.onnx")
+if not os.path.exists(MODEL_PATH):
+    download_from_drive(model_dict[lang], MODEL_PATH)
 
 # ----------------------------
 # Load ONNX Runtime Session
@@ -91,20 +93,14 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://vasu-meesho.github.io/indicconformer_asr_onnx/"],  # Change to your domain in production
+    allow_origins=["*"],  # Change to your domain in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
-    
-    MODEL_PATH = os.path.join(MODEL_DIR, f"model_{lang}.onnx")
-    if not os.path.exists(MODEL_PATH):
-        download_from_drive(model_dict[lang], MODEL_PATH)
     model = OnnxModel(MODEL_PATH)
-    
-
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
