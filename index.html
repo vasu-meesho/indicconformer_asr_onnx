@@ -1,115 +1,102 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Multilingual ASR Demo</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #f9f9f9;
-    }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 20px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    select, button {
-      padding: 10px;
-      margin: 10px 5px;
-      font-size: 1rem;
-    }
-    #preview {
-      margin-top: 20px;
-      width: 100%;
-    }
-    #result {
-      margin-top: 20px;
-      font-size: 1.1rem;
-      padding: 10px;
-      background: #eef;
-      border-radius: 4px;
-    }
-  </style>
+    <title>Audio Recorder with Language Selection</title>
+    <style>
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; }
+        button { padding: 10px 20px; margin: 5px; }
+        #preview { margin: 20px 0; }
+        #result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Speech to Text</h2>
+    <div class="container">
+        <h1>Audio Recorder</h1>
+        
+        <!-- Language Selection -->
+        <select id="language">
+            <option value="en">English</option>
+            <option value="hi">Hindi</option>
+            <option value="ta">Tamil</option>
+            <option value="bn">Bengali</option>
+        </select>
 
-    <!-- Language Selection -->
-    <label for="language">Select Language:</label>
-    <select id="language">
-      <option value="en">English</option>
-      <option value="hi">Hindi</option>
-      <option value="ta">Tamil</option>
-      <option value="te">Telugu</option>
-      <!-- Add more as needed -->
-    </select>
+        <!-- Recording Controls -->
+        <div class="controls">
+            <button id="recordButton">Start Recording</button>
+            <button id="stopButton" disabled>Stop & Upload</button>
+        </div>
 
-    <!-- Buttons -->
-    <div>
-      <button id="recordButton">🎙️ Start Recording</button>
-      <button id="stopButton" disabled>⏹️ Stop & Upload</button>
+        <!-- Audio Preview -->
+        <audio id="preview" controls></audio>
+
+        <!-- Results Display -->
+        <div id="result"></div>
     </div>
 
-    <!-- Audio Preview -->
-    <audio id="preview" controls></audio>
+<script>
+const BACKEND_URL = 'https://your-backend.onrender.com/upload';  // <-- CHANGE THIS
 
-    <!-- Result -->
-    <div id="result"></div>
-  </div>
+const recordButton = document.getElementById('recordButton');
+const stopButton = document.getElementById('stopButton');
+const languageSelect = document.getElementById('language');
+const preview = document.getElementById('preview');
+const resultDiv = document.getElementById('result');
 
-  <script>
-    const recordBtn = document.getElementById('recordButton');
-    const stopBtn = document.getElementById('stopButton');
-    const preview = document.getElementById('preview');
-    const resultDiv = document.getElementById('result');
-    const languageSelect = document.getElementById('language');
+let mediaRecorder;
+let audioChunks = [];
 
-    let mediaRecorder;
-    let audioChunks = [];
+// Start Recording
+recordButton.addEventListener('click', async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
 
-    recordBtn.onclick = async () => {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      audioChunks = [];
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
 
-      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            preview.src = URL.createObjectURL(audioBlob);
+            await uploadAudio(audioBlob);
+        };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-        preview.src = URL.createObjectURL(audioBlob);
+        mediaRecorder.start();
+        recordButton.disabled = true;
+        stopButton.disabled = false;
+    } catch (err) {
+        console.error('Error accessing microphone:', err);
+    }
+});
 
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.wav');
-        formData.append('language', languageSelect.value);
+// Stop Recording
+stopButton.addEventListener('click', () => {
+    mediaRecorder.stop();
+    recordButton.disabled = false;
+    stopButton.disabled = true;
+});
 
-        try {
-          const res = await fetch('https://indicconformer-asr-onnx.onrender.com', {
+// Upload to Backend
+async function uploadAudio(blob) {
+    const formData = new FormData();
+    formData.append('audio', blob, 'recording.wav');
+    formData.append('language', languageSelect.value);
+
+    try {
+        const response = await fetch(BACKEND_URL, {
             method: 'POST',
             body: formData
-          });
+        });
 
-          const json = await res.json();
-          resultDiv.textContent = 'Transcription: ' + json.transcription;
-        } catch (err) {
-          console.error(err);
-          resultDiv.textContent = '❌ Transcription failed. Check console.';
-        }
-      };
-
-      mediaRecorder.start();
-      recordBtn.disabled = true;
-      stopBtn.disabled = false;
-      resultDiv.textContent = '';
-    };
-
-    stopBtn.onclick = () => {
-      mediaRecorder.stop();
-      recordBtn.disabled = false;
-      stopBtn.disabled = true;
-    };
-  </script>
+        const result = await response.text();
+        resultDiv.textContent = `Server Response: ${result}`;
+    } catch (error) {
+        console.error('Upload failed:', error);
+        resultDiv.textContent = 'Upload failed - check console';
+    }
+}
+</script>
 </body>
 </html>
