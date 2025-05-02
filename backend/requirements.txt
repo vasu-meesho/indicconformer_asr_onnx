@@ -4,3 +4,4 @@ onnxruntime
 soundfile
 numpy
 requests
+kaldi_native_fbank
