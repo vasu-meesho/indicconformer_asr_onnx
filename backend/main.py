@@ -98,12 +98,12 @@ app.add_middleware(
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
-    if lang not in onnx_sessions:
-        return {"error": f"Unsupported language: {lang}"}
+    
     MODEL_PATH = os.path.join(MODEL_DIR, f"model_{lang}.onnx")
-    model = OnnxModel(MODEL_PATH)
     if not os.path.exists(MODEL_PATH):
         download_from_drive(FILE_ID, MODEL_PATH)
+    model = OnnxModel(MODEL_PATH)
+    
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(await file.read())
