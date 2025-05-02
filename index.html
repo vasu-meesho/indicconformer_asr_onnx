@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Recorder with Language Selection</title>
     <style>
         .container { max-width: 600px; margin: 20px auto; padding: 20px; }
@@ -12,13 +14,11 @@
 <body>
     <div class="container">
         <h1>Audio Recorder</h1>
-        
+
         <!-- Language Selection -->
         <select id="language">
-            <option value="en">English</option>
             <option value="hi">Hindi</option>
-            <option value="ta">Tamil</option>
-            <option value="bn">Bengali</option>
+            <!-- Add other languages as needed -->
         </select>
 
         <!-- Recording Controls -->
@@ -34,69 +34,66 @@
         <div id="result"></div>
     </div>
 
-<script>
-const BACKEND_URL = 'https://your-backend.onrender.com/upload';  // <-- CHANGE THIS
+    <script>
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const languageSelect = document.getElementById('language');
+        const preview = document.getElementById('preview');
+        const resultDiv = document.getElementById('result');
 
-const recordButton = document.getElementById('recordButton');
-const stopButton = document.getElementById('stopButton');
-const languageSelect = document.getElementById('language');
-const preview = document.getElementById('preview');
-const resultDiv = document.getElementById('result');
+        let mediaRecorder;
+        let audioChunks = [];
 
-let mediaRecorder;
-let audioChunks = [];
+        // Initialize recording
+        recordButton.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
 
-// Start Recording
-recordButton.addEventListener('click', async () => {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
 
-        mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
-        };
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    preview.src = URL.createObjectURL(audioBlob);
+                    await uploadAudio(audioBlob);
+                };
 
-        mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            preview.src = URL.createObjectURL(audioBlob);
-            await uploadAudio(audioBlob);
-        };
-
-        mediaRecorder.start();
-        recordButton.disabled = true;
-        stopButton.disabled = false;
-    } catch (err) {
-        console.error('Error accessing microphone:', err);
-    }
-});
-
-// Stop Recording
-stopButton.addEventListener('click', () => {
-    mediaRecorder.stop();
-    recordButton.disabled = false;
-    stopButton.disabled = true;
-});
-
-// Upload to Backend
-async function uploadAudio(blob) {
-    const formData = new FormData();
-    formData.append('audio', blob, 'recording.wav');
-    formData.append('language', languageSelect.value);
-
-    try {
-        const response = await fetch(BACKEND_URL, {
-            method: 'POST',
-            body: formData
+                mediaRecorder.start();
+                recordButton.disabled = true;
+                stopButton.disabled = false;
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+            }
         });
 
-        const result = await response.text();
-        resultDiv.textContent = `Server Response: ${result}`;
-    } catch (error) {
-        console.error('Upload failed:', error);
-        resultDiv.textContent = 'Upload failed - check console';
-    }
-}
-</script>
+        // Stop recording
+        stopButton.addEventListener('click', () => {
+            mediaRecorder.stop();
+            recordButton.disabled = false;
+            stopButton.disabled = true;
+        });
+
+        // Upload handler
+        async function uploadAudio(blob) {
+            const formData = new FormData();
+            formData.append('audio', blob, 'recording.wav');
+            formData.append('lang', languageSelect.value);
+
+            try {
+                const response = await fetch('https://indicconformer-asr-onnx.onrender.com/transcribe', { // Replace with your backend URL
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                resultDiv.textContent = `Server Response: ${result.transcription}`;
+            } catch (error) {
+                console.error('Upload failed:', error);
+                resultDiv.textContent = 'Upload failed - check console';
+            }
+        }
+    </script>
 </body>
 </html>
