@@ -8,3 +8,4 @@ kaldi_native_fbank
 torch
 librosa
 gdown
+python-multipart
