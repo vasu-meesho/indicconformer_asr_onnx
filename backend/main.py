@@ -79,7 +79,7 @@ class OnnxModel:
 os.makedirs(MODEL_DIR, exist_ok=True)
 MODEL_PATH = os.path.join(MODEL_DIR, f"model_hi.onnx")
 if not os.path.exists(MODEL_PATH):
-    download_from_drive(model_dict[lang], MODEL_PATH)
+    download_from_drive(model_dict['hi'], MODEL_PATH)
 
 # ----------------------------
 # Load ONNX Runtime Session
