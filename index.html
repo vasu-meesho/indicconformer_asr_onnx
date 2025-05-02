@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multilingual ASR</title>
+</head>
+<body>
+  <h2>Multilingual ASR Demo</h2>
+
+  <label for="lang">Select Language:</label>
+  <select id="lang">
+    <option value="bn">Bengali</option>
+    <option value="gu">Gujarati</option>
+    <option value="hi">Hindi</option>
+    <option value="kn">Kannada</option>
+    <option value="ml">Malayalam</option>
+    <option value="mr">Marathi</option>
+    <option value="or">Odia</option>
+    <option value="pa">Punjabi</option>
+    <option value="ta">Tamil</option>
+    <option value="ta">Telugu</option>
+    <!-- Add more options -->
+  </select>
+
+  <br><br>
+  <button id="record">🎙️ Record</button>
+  <button id="stop">🛑 Stop</button>
+  <p id="output">Output will appear here...</p>
+
+  <script>
+    let mediaRecorder, audioChunks = [];
+
+    document.getElementById('record').onclick = async () => {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append("file", audioBlob, "audio.wav");
+
+        const lang = document.getElementById("lang").value;
+        formData.append("lang", lang);
+
+        const response = await fetch("https://indicconformer-asr-onnx.onrender.com/transcribe", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await response.json();
+        document.getElementById("output").innerText = data.transcription || data.error;
+      };
+
+      mediaRecorder.start();
+    };
+
+    document.getElementById('stop').onclick = () => {
+      mediaRecorder.stop();
+    };
+  </script>
+</body>
+</html>
