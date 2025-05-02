@@ -79,7 +79,7 @@ with open(tokens, encoding="utf-8") as f:
         id2token[int(idx)] = t
 blank = len(id2token) - 1
 
-'''
+
 # ----------------------------
 # FastAPI Setup
 # ----------------------------
