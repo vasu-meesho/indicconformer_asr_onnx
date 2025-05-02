@@ -64,8 +64,7 @@ class OnnxModel:
 
 # Ensure model exists
 os.makedirs(MODEL_DIR, exist_ok=True)
-if not os.path.exists(MODEL_PATH):
-    download_from_drive(FILE_ID, MODEL_PATH)
+
 
 # ----------------------------
 # Load ONNX Runtime Session
@@ -98,6 +97,8 @@ async def transcribe(file: UploadFile = File(...), lang: str = Form(...)):
     if lang not in onnx_sessions:
         return {"error": f"Unsupported language: {lang}"}
     MODEL_PATH = os.path.join(MODEL_DIR, f"model_{lang}.onnx")
+    if not os.path.exists(MODEL_PATH):
+        download_from_drive(FILE_ID, MODEL_PATH)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(await file.read())
