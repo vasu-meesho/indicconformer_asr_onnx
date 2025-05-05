@@ -124,6 +124,9 @@
                     body: formData,
                     // You might need these additional settings:
                     credentials: 'include',  // If you need to send cookies
+                    headers: {
+                        'Content-Type': 'multipart/form-data', // If formData doesn't already set Content-Type automatically
+                    }
                     cache: 'no-store',
                     redirect: 'follow'
                 });
