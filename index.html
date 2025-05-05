@@ -121,7 +121,12 @@
             try {
                 const response = await fetch('https://indicconformer-asr-onnx.onrender.com/transcribe', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    // You might need these additional settings:
+                    credentials: 'include',  // If you need to send cookies
+                    headers: {
+                       'Content-Type': 'multipart/form-data',  // If formData doesn't already set Content-Type automatically
+                    }
                 });
 
                 if (response.ok) {
