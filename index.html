@@ -5,27 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Recorder with Language Selection</title>
     <style>
-        .container { max-width: 600px; margin: 20px auto; padding: 20px; }
-        button { padding: 10px 20px; margin: 5px; }
-        #preview { margin: 20px 0; }
-        #result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; font-family: Arial, sans-serif; }
+        button { padding: 10px 20px; margin: 5px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        button:disabled { background-color: #cccccc; }
+        select { padding: 8px; margin: 5px; }
+        #preview { margin: 20px 0; width: 100%; }
+        #result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; min-height: 60px; }
+        #status { color: #ff6600; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Audio Recorder</h1>
+        <h1>Indic Audio Transcription</h1>
 
         <!-- Language Selection -->
-        <select id="language">
-            <option value="hi">Hindi</option>
-            <!-- Add other languages as needed -->
-        </select>
+        <div>
+            <label for="language">Select Language:</label>
+            <select id="language">
+                <option value="hi">Hindi</option>
+                <!-- Add other languages as needed -->
+            </select>
+        </div>
 
         <!-- Recording Controls -->
         <div class="controls">
             <button id="recordButton">Start Recording</button>
-            <button id="stopButton" disabled>Stop & Upload</button>
+            <button id="stopButton" disabled>Stop Recording</button>
         </div>
+
+        <!-- Status indication -->
+        <div id="status"></div>
 
         <!-- Audio Preview -->
         <audio id="preview" controls></audio>
@@ -40,16 +49,18 @@
         const languageSelect = document.getElementById('language');
         const preview = document.getElementById('preview');
         const resultDiv = document.getElementById('result');
+        const statusDiv = document.getElementById('status');
 
         let mediaStream = null;
         let mediaRecorder;
+        let audioContext;
 
         // Initialize recording
         recordButton.addEventListener('click', async () => {
-            
             let audioChunks = [];
             resultDiv.textContent = '';
-            localStorage.removeItem('transcriptions');
+            statusDiv.textContent = 'Recording...';
+            
             try {
                 const stream = await getMediaStream();
                 mediaRecorder = new MediaRecorder(stream);
@@ -59,15 +70,26 @@
                 };
 
                 mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    statusDiv.textContent = 'Processing audio...';
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     preview.src = URL.createObjectURL(audioBlob);
-                    const audioContext = new AudioContext();
-                    const arrayBuffer = await audioBlob.arrayBuffer();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                     
-                    // ENCODE to proper WAV
-                    const wavBlob = await encodeWav(audioBuffer);
-                    await uploadAudio(wavBlob);
+                    if (!audioContext) {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    
+                    try {
+                        const arrayBuffer = await audioBlob.arrayBuffer();
+                        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                        
+                        // Convert to WAV for server compatibility
+                        const wavBlob = await encodeWav(audioBuffer);
+                        statusDiv.textContent = 'Uploading to server...';
+                        await uploadAudio(wavBlob);
+                    } catch (err) {
+                        console.error('Error processing audio:', err);
+                        statusDiv.textContent = 'Error processing audio: ' + err.message;
+                    }
                 };
 
                 mediaRecorder.start();
@@ -75,23 +97,27 @@
                 stopButton.disabled = false;
             } catch (err) {
                 console.error('Error accessing microphone:', err);
+                statusDiv.textContent = 'Error: ' + err.message;
             }
         });
 
         // Stop recording
         stopButton.addEventListener('click', () => {
-            mediaRecorder.stop();
-            recordButton.disabled = false;
-            stopButton.disabled = true;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordButton.disabled = false;
+                stopButton.disabled = true;
+            }
         });
 
         // Upload handler
         async function uploadAudio(blob) {
             const formData = new FormData();
-            formData.append('file', blob, 'recording.wav');  // Ensure the field name matches the backend's expected name
-            formData.append('lang', languageSelect.value);  // Assuming you're passing the language parameter too
+            formData.append('file', blob, 'recording.wav');
+            formData.append('lang', languageSelect.value);
             
-            
+            console.log("Uploading audio, size:", Math.round(blob.size / 1024), "KB");
+
             try {
                 const response = await fetch('https://indicconformer-asr-onnx.onrender.com/transcribe', {
                     method: 'POST',
@@ -99,32 +125,53 @@
                 });
 
                 if (response.ok) {
-                    const result = await response.json();  // Assuming the backend returns JSON
-                    resultDiv.textContent = `Server Response: ${result.transcription}`;
+                    const result = await response.json();
+                    statusDiv.textContent = '';
+                    resultDiv.textContent = `Transcription: ${result.transcription}`;
                 } else {
-                    const errorData = await response.json();
-                    console.error('Error:', errorData);
-                    resultDiv.textContent = 'Error occurred: ' + errorData.detail;
+                    let errorText = 'Server error: ' + response.status;
+                    try {
+                        const errorData = await response.json();
+                        errorText += ' - ' + (errorData.detail || errorData.error || JSON.stringify(errorData));
+                    } catch (e) {
+                        // If can't parse JSON
+                        errorText += ' - ' + await response.text();
+                    }
+                    console.error(errorText);
+                    statusDiv.textContent = '';
+                    resultDiv.textContent = errorText;
                 }
             } catch (error) {
                 console.error('Upload failed:', error);
-                resultDiv.textContent = 'Upload failed - check console';
+                statusDiv.textContent = '';
+                resultDiv.textContent = 'Connection error: ' + error.message;
             }
         }
         
         async function getMediaStream() {
-            if (!mediaStream) {
-                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (mediaStream) {
+                const tracks = mediaStream.getTracks();
+                tracks.forEach(track => track.stop());
             }
+            
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                }
+            });
             return mediaStream;
         }
         
         // Convert AudioBuffer to proper WAV format
         async function encodeWav(audioBuffer) {
-            const numChannels = audioBuffer.numberOfChannels;
+            const numChannels = 1; // Force mono for ASR
             const sampleRate = audioBuffer.sampleRate;
             const bytesPerSample = 2; // 16-bit PCM
             const blockAlign = numChannels * bytesPerSample;
+            const length = audioBuffer.length;
             
             const wavHeader = new ArrayBuffer(44);
             const view = new DataView(wavHeader);
@@ -137,7 +184,7 @@
             }
             
             writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + audioBuffer.length * blockAlign, true);
+            view.setUint32(4, 36 + length * blockAlign, true);
             writeString(view, 8, 'WAVE');
             writeString(view, 12, 'fmt ');
             view.setUint32(16, 16, true); // Subchunk1Size
@@ -148,27 +195,24 @@
             view.setUint16(32, blockAlign, true);
             view.setUint16(34, bytesPerSample * 8, true);
             writeString(view, 36, 'data');
-            view.setUint32(40, audioBuffer.length * blockAlign, true);
+            view.setUint32(40, length * blockAlign, true);
 
-            // Merge header and PCM data
-            const pcm = new Float32Array(audioBuffer.length * numChannels);
-            for (let ch = 0; ch < numChannels; ch++) {
-                pcm.set(audioBuffer.getChannelData(ch), ch * audioBuffer.length);
-            }
-            
-            const wavData = new Uint8Array(wavHeader.byteLength + pcm.length * 2);
-            wavData.set(new Uint8Array(wavHeader), 0);
+            // Extract PCM data - use only first channel if stereo
+            const pcmData = audioBuffer.getChannelData(0);
             
             // Convert to 16-bit PCM
-            const pcm16 = new Int16Array(pcm.length);
-            for (let i = 0; i < pcm.length; i++) {
-                pcm16[i] = Math.max(-32768, Math.min(32767, pcm[i] * 32767));
+            const pcm16 = new Int16Array(length);
+            for (let i = 0; i < length; i++) {
+                pcm16[i] = Math.max(-32768, Math.min(32767, pcmData[i] * 32767));
             }
-            wavData.set(new Uint8Array(pcm16.buffer), 44);
             
-            return new Blob([wavData], { type: 'audio/wav' });
+            // Combine header and data
+            const wavBuffer = new Uint8Array(wavHeader.byteLength + pcm16.buffer.byteLength);
+            wavBuffer.set(new Uint8Array(wavHeader), 0);
+            wavBuffer.set(new Uint8Array(pcm16.buffer), wavHeader.byteLength);
+            
+            return new Blob([wavBuffer], { type: 'audio/wav' });
         }
-
     </script>
 </body>
 </html>
