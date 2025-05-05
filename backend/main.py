@@ -37,10 +37,10 @@ app = FastAPI(
 # For production, replace with the specific domains you want to allow
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with your frontend domains in production
+    allow_origins=["https://vasu-meesho.github.io"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Model configuration
